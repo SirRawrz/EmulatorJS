@@ -1,7 +1,7 @@
 This is a Fork of EmulatorJS. Only the index.html has changed. For each of the different emulators I have seperate index.htmls. indexgba.html for example. This fork when self hosted with https://simplewebserver.org/ on windows or https://play.google.com/store/apps/details?id=com.phlox.simpleserver.plus&hl=en_US for android (Change Platform to "android" instead of "windows" in platform.txt if using the android setup. It is set to windows by default.) For PSP to work you will need to setup custom headers (I'll come back with these) and to generate a certificate for your https server, as shared array buffer requires https, and https requires this a cert.  
 
 Set your serverip.txt to the ip you're selfhosting. "192.168.0.205:8080" for example. (This method is intended for local only. If you want to use it away from home, look into something like Tailscale.)
-(
+(WARNING: Still under construction until this is removed!)
 <div align = center>
 
 <img width = 300 src = docs/Logo-light.png#gh-dark-mode-only>
