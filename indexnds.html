@@ -1,0 +1,1141 @@
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<html>
+    <head>
+        <title>EmulatorJS</title>
+        <link rel = icon href = docs/favicon.ico sizes = "16x16 32x32 48x48 64x64" type = image/vnd.microsoft.icon>
+        <meta name = viewport content = "width = device-width, initial-scale = 1">
+        <style>
+             body, html {
+                height: 100%;
+                background-color: black;
+                color: white;
+            }
+
+            body {
+                margin: 0;
+                overflow: hidden;
+            }
+
+            body, #box, #top {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+            }
+
+            #box {
+                color: #aaa;
+                height: 20em;
+                width: 30em;
+                max-width: 80%;
+                max-height: 80%;
+                background-color: #333;
+                border-radius: 0.4em;
+                border: 2px solid #555;
+                position: relative;
+                flex-direction: column;
+                transition-duration: 0.2s;
+                overflow: hidden;
+                font-family: monospace;
+                font-weight: bold;
+                font-size: 20px;
+                margin: 5px;
+            }
+
+            #box:hover, #box[drag] {
+                border-color: #38f;
+                color: #ddd
+            }
+
+            #input {
+                cursor: pointer;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                opacity: 0
+            }
+
+            #display {
+                width: 100%;
+                height: 100%
+            }
+
+            select, button {
+                padding: 0.6em 0.4em;
+                margin: 0.5em;
+                width: 15em;
+                max-width: 100%;
+                font-family: monospace;
+                font-weight: bold;
+                font-size: 16px;
+                background-color: #6A5F7D;
+                color: #aaa;
+                border-radius: 0.4em;
+                border: 1px solid #555;
+                cursor: pointer;
+                transition-duration: 0.2s
+            }
+
+            select:hover, button:hover {
+                background-color: #666;
+                color: #ddd
+            }
+
+            .logo {
+                width: 130px;
+                height: 130px;
+                filter: drop-shadow(0 0 10px white);
+            }
+
+            #top {
+                margin: 5px;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div id="top">
+            <h1>EmulatorJS Demo</h1>
+            <img src="docs/Logo-light.png" alt="Logo" class="logo">
+        </div>
+    <script>
+	// save your server ip and port serverip.txt in emulator folder
+	
+
+	    window.EJS_defaultOptions = {
+'ff-ratio':'1.5',
+'pcsx_rearmed_cd_readahead':'32',
+'pcsx_rearmed_psxclock':'33',
+'shader':'crt-aperture.glslp'
+        };
+      window.onload = async function () {
+  // ——— Load server IP from serverip.txt ———
+  let serverIP = 'localhost:8080';
+  try {
+    const resp = await fetch('./serverip.txt', { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    serverIP = (await resp.text()).trim();
+  } catch (e) {
+    console.warn('Could not load serverip.txt, defaulting to localhost:8080', e);
+  }
+
+  // ——— Begin original onload logic ———
+  const urlParams = new URLSearchParams(window.location.search);
+  const romParam  = urlParams.get('rom');
+
+  if (!romParam) {
+    console.error("No ROM specified in the URL.");
+    return;
+  }
+
+  // Clear the page content
+  document.body.innerHTML = "";
+
+  // Create emulator container
+  const displayDiv = document.createElement("div");
+  displayDiv.id = "display";
+  const gameDiv = document.createElement("div");
+  gameDiv.id = "game";
+  displayDiv.appendChild(gameDiv);
+  document.body.appendChild(displayDiv);
+
+  // Configure EmulatorJS
+  window.EJS_player      = "#game";
+  window.EJS_gameName    = romParam;
+  window.EJS_gameUrl     = `http://${serverIP}/emulator/roms/${romParam}?t=${Date.now()}`;
+  window.EJS_core        = "nds";
+  window.EJS_pathtodata  = "data/";
+  window.EJS_startOnLoaded = true;
+		
+			
+            // Load EmulatorJS
+            const script = document.createElement("script");
+            script.src = "data/loader.js";
+ script.onload = () => {
+                console.log("EmulatorJS Loaded");
+                
+                // Create Save Location Dialog
+                const saveDialog = document.createElement("div");
+                saveDialog.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: #333;
+                    padding: 20px;
+                    border-radius: 8px;
+                    border: 2px solid #555;
+                    z-index: 10000;
+                    display: none;
+                    box-shadow: 0 0 15px rgba(0,0,0,0.5);
+                `;
+                
+const saveDialogContent = `
+    <div style="text-align: center; color: #aaa; margin-bottom: 15px; font-family: monospace;">
+        Choose Save Location
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 10px;">
+        <button id="saveBrowser" style="
+            background: #5F7D6A;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+        ">Browser Storage</button>
+        
+        <button id="saveDownload" style="
+            background: #6A5F7D;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+        ">Download File</button>
+        
+        <button id="saveMem1" style="
+            background: #4E89AE;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+        ">Memory Card 1</button>
+        
+        <button id="saveMem2" style="
+            background: #4E89AE;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+        ">Memory Card 2</button>
+    </div>
+`;
+
+                saveDialog.innerHTML = saveDialogContent;
+                document.body.appendChild(saveDialog);
+
+
+// Memory Card 1 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ upload the raw state to /Profiles/<profile>-<game>.state
+// ====== SAVE HANDLER (Memory Card 1) ======
+document.getElementById('saveMem1').onclick = async () => {
+  saveDialog.style.display = 'none';
+  try {
+    const emulator = window.EJS_emulator;
+    const state    = emulator.gameManager.getState(); // Uint8Array
+    const profile  = localStorage.getItem("activeProfile") || "Guest";
+    const baseName = emulator.getBaseFileName();
+    const fileName = `${profile}-${baseName}`;
+
+    // Convert Uint8Array â†’ Base64
+    function uint8ToBase64(uint8Array) {
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, uint8Array.subarray(i, i + chunkSize));
+      }
+      return btoa(binary);
+    }
+    const base64  = uint8ToBase64(state);
+    const wrapped = `[[[${base64}]]]`;
+
+    // Send as FormData blob
+    const form = new FormData();
+    form.append("files[]", new Blob([wrapped], { type: "text/plain" }), fileName);
+    const res = await fetch(`/emulator/Mem1/${encodeURIComponent(fileName)}`, {
+      method: 'PUT',
+      body: form
+    });
+    if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+    showSavedIndicator();
+  } catch (err) {
+    console.error("Save failed:", err);
+    alert(`Save error: ${err.message}`);
+  }
+};
+// ====== SAVE HANDLER ======
+// ====== SAVE HANDLER (Memory Card 2) ======
+document.getElementById('saveMem2').onclick = async () => {
+  saveDialog.style.display = 'none';
+  try {
+    const emulator = window.EJS_emulator;
+    const state    = emulator.gameManager.getState(); // Uint8Array
+    const profile  = localStorage.getItem("activeProfile") || "Guest";
+    const baseName = emulator.getBaseFileName();
+    const fileName = `${profile}-${baseName}`;
+
+    // Convert Uint8Array â†’ Base64
+    function uint8ToBase64(uint8Array) {
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, uint8Array.subarray(i, i + chunkSize));
+      }
+      return btoa(binary);
+    }
+    const base64  = uint8ToBase64(state);
+    const wrapped = `[[[${base64}]]]`;
+
+    // Send as FormData blob
+    const form = new FormData();
+    form.append("files[]", new Blob([wrapped], { type: "text/plain" }), fileName);
+    const res = await fetch(`/emulator/Mem2/${encodeURIComponent(fileName)}`, {
+      method: 'PUT',
+      body: form
+    });
+    if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+    showSavedIndicator();
+  } catch (err) {
+    console.error("Save failed:", err);
+    alert(`Save error: ${err.message}`);
+  }
+};
+
+
+             // Home Button
+                const homeButton = document.createElement("a");
+                homeButton.href = "../index.html";
+                homeButton.innerText = "Home";
+                homeButton.style.cssText = `
+                    position: fixed;
+                    top: 5px;
+                    left: 5px;
+                    z-index: 9999;
+                    padding: 3px 3px;
+                    background: #ff4444;
+                    color: white;
+                    border-radius: 3px;
+                    text-decoration: none;
+                    font-family: Arial, sans-serif;
+                    font-weight: bold;
+                    box-shadow: 0 2px 2px rgba(0,0,0,0.3);
+                `;
+                document.body.appendChild(homeButton);
+                // Save Button
+                const saveButton = document.createElement("a");
+                saveButton.href = "#";
+                saveButton.innerText = "Save";
+                saveButton.style.cssText = `
+                    position: fixed;
+                    top: 5px;
+                    left: 56px;
+                    z-index: 9999;
+                    padding: 3px 3px;
+                    background: #6A5F7D;
+                    color: white;
+                    border-radius: 3px;
+                    text-decoration: none;
+                    font-family: Arial, sans-serif;
+                    font-weight: bold;
+                    box-shadow: 0 2px 2px rgba(0,0,0,0.3);
+                `;
+                saveButton.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    try {
+                        const emulator = window.EJS_emulator;
+                        const state = emulator.gameManager.getState();
+                        const screenshot = await emulator.gameManager.screenshot();
+                        
+       // Close button for save dialog
+const closeSaveDialogButton = document.createElement("button");
+closeSaveDialogButton.innerHTML = "&times;";
+closeSaveDialogButton.style.cssText = `
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+`;
+saveDialog.appendChild(closeSaveDialogButton);
+
+closeSaveDialogButton.onclick = () => {
+    saveDialog.style.display = 'none';
+};
+
+// Show save location dialog
+saveDialog.style.display = 'block';
+                        
+                        // Browser storage handler
+                        document.getElementById('saveBrowser').onclick = async () => {
+    saveDialog.style.display = 'none';
+    try {
+        // Saving the game state to local storage
+        const stateKey = emulator.getBaseFileName() + ".state";
+        await emulator.storage.states.put(stateKey, state);
+        console.log("State saved to browser storage with key:", stateKey);
+  //      alert("State saved to browser storage!");
+    } catch (error) {
+        console.error("Browser save failed:", error);
+        alert("Error saving to browser storage!");
+    }
+};
+                        
+                        // File download handler
+                        document.getElementById('saveDownload').onclick = () => {
+                            saveDialog.style.display = 'none';
+                            try {
+                                const blob = new Blob([state]);
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement("a");
+                                link.href = url;
+                                link.download = emulator.getBaseFileName() + ".state";
+                                link.click();
+                                URL.revokeObjectURL(url);
+                         //       alert("Save file downloading...");
+                            } catch (error) {
+                                console.error("Download failed:", error);
+                                alert("Error generating download!");
+                            }
+                        };
+                        
+                    } catch (error) {
+                        console.error("Save preparation failed:", error);
+                        alert("Error preparing save!");
+                    }
+                });
+                document.body.appendChild(saveButton);
+
+// ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Load Location Dialog ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
+const loadDialog = document.createElement("div");
+Object.assign(loadDialog.style, {
+  position: "fixed",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  background: "#333",
+  padding: "20px",
+  borderRadius: "8px",
+  border: "2px solid #555",
+  zIndex: "10000",
+  display: "none",
+  boxShadow: "0 0 15px rgba(0,0,0,0.5)",
+});
+loadDialog.innerHTML = `
+  <div style="text-align:center;color:#aaa;margin-bottom:15px;font-family:monospace;">
+    Choose Load Source
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+    <button id="loadBrowser" style="
+      background:#5F7D6A;color:white;border:none;
+      padding:8px;border-radius:4px;font-family:monospace;cursor:pointer;
+    ">Browser Storage</button>
+    <button id="loadFile" style="
+      background:#6A5F7D;color:white;border:none;
+      padding:8px;border-radius:4px;font-family:monospace;cursor:pointer;
+    ">From File</button>
+    <button id="loadMem1" style="
+      background:#4E89AE;color:white;border:none;
+      padding:8px;border-radius:4px;font-family:monospace;cursor:pointer;
+    ">Memory Card 1</button>
+    <button id="loadMem2" style="
+      background:#4E89AE;color:white;border:none;
+      padding:8px;border-radius:4px;font-family:monospace;cursor:pointer;
+    ">Memory Card 2</button>
+  </div>
+`;
+document.body.appendChild(loadDialog);
+
+// === PLATFORM SWITCHABLE SAVE/LOAD HANDLERS ===
+// ——— PLATFORM‑DRIVEN SAVE/LOAD HANDLERS ———
+(async () => {
+  // 1) Load platform string from file
+  let platformMode = 'windows';  // fallback
+  try {
+    const txt = await fetch('./platform.txt', { cache: 'no-store' })
+                     .then(res => {
+                       if (!res.ok) throw new Error(res.status);
+                       return res.text();
+                     });
+    platformMode = txt.trim();
+  } catch (e) {
+    console.warn('Could not load platform.txt, defaulting to “windows”');
+  }
+
+  // 2) Attach SAVE handlers
+  ['saveMem1', 'saveMem2'].forEach((btnId, idx) => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.onclick = async () => {
+      saveDialog.style.display = 'none';
+      try {
+        const emulator = window.EJS_emulator;
+        const state    = emulator.gameManager.getState();
+        const profile  = localStorage.getItem("activeProfile") || "Guest";
+        const baseName = emulator.getBaseFileName();
+        const fileName = `${profile}-${baseName}`;
+        const slot     = `Mem${idx+1}`;
+
+        // Base64 helper
+        function uint8ToBase64(u8) {
+          let b='', cs=0x8000;
+          for (let i=0; i<u8.length; i+=cs) b += String.fromCharCode.apply(null, u8.subarray(i, i+cs));
+          return btoa(b);
+        }
+
+        const wrapped = `[[[${uint8ToBase64(state)}]]]`;
+        const form    = new FormData();
+        form.append("files[]", new Blob([wrapped], { type: "text/plain" }), fileName);
+
+        // if you host this on Android http simple server plus, platform.txt should read: android
+		// by default it is compatabile with window's simple web server 
+        const url = platformMode === 'windows'
+          ? `/emulator/${slot}/${encodeURIComponent(fileName)}`
+          : `/api/file/upload?path=${encodeURIComponent(`/emulator/${slot}/`)}`;
+
+        const res = await fetch(url, { method: 'PUT', body: form });
+        if (!res.ok) throw new Error(res.status);
+        showSavedIndicator();
+      } catch (err) {
+        console.error("Save failed:", err);
+        alert(`Save error: ${err.message}`);
+      }
+    };
+  });
+
+  // 3) Attach LOAD handlers
+  ['loadMem1','loadMem2'].forEach((btnId, idx) => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.onclick = async () => {
+      loadDialog.style.display = 'none';
+      try {
+        const emulator = window.EJS_emulator;
+        const profile  = localStorage.getItem("activeProfile") || "Guest";
+        const baseName = emulator.getBaseFileName();
+        const fileName = `${profile}-${baseName}`;
+        const slot     = `Mem${idx+1}`;
+        let buffer     = null;
+
+        for (const name of [fileName, fileName.replace(/\.[^.]+$/,'')]) {
+          const res  = await fetch(`/emulator/${slot}/${encodeURIComponent(name)}`, { cache: 'no-store' });
+          if (!res.ok) continue;
+          const txt  = await res.text();
+          const m    = txt.match(/\[\[\[([\s\S]*?)\]\]\]/);
+          if (!m) continue;
+          const bin  = atob(m[1]);
+          buffer     = new Uint8Array([...bin].map(c=>c.charCodeAt(0)));
+          break;
+        }
+        if (!buffer) throw new Error("No valid save found");
+        await emulator.gameManager.loadState(buffer);
+      } catch (err) {
+        console.error("Load error:", err);
+        alert(`Load error: ${err.message}`);
+      }
+    };
+  });
+})();
+
+// Add Close Button to Load Dialog
+const closeLoadDialogButton = document.createElement("button");
+closeLoadDialogButton.innerHTML = "&times;";
+Object.assign(closeLoadDialogButton.style, {
+    position: "absolute",
+    top: "-3px",
+    right: "10px",
+    background: "transparent",
+    border: "none",
+    color: "white",
+    fontSize: "20px",
+    cursor: "pointer",
+    lineHeight: "1"
+});
+closeLoadDialogButton.onclick = () => {
+    loadDialog.style.display = 'none';
+};
+loadDialog.appendChild(closeLoadDialogButton);
+
+// 0000000000000000000000000000000000000000000000000
+// ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Load Button ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
+const loadButton = document.createElement("a");
+loadButton.href = "#";
+loadButton.innerText = "Load";
+Object.assign(loadButton.style, {
+  position: "fixed",
+  top: "5px",
+  left: "99px",
+  zIndex: "9999",
+  padding: "3px 3px",
+  background: "#5F7D6A",
+  color: "white",
+  borderRadius: "3px",
+  textDecoration: "none",
+  fontFamily: "Arial, sans-serif",
+  fontWeight: "bold",
+  boxShadow: "0 2px 2px rgba(0,0,0,0.3)",
+});
+loadButton.addEventListener("click", (e) => {
+  e.preventDefault();
+  loadDialog.style.display = "block";
+});
+document.body.appendChild(loadButton);
+
+// ====== LOAD HANDLER: Browser Storage ======
+document.getElementById("loadBrowser").onclick = async () => {
+  loadDialog.style.display = "none";
+  try {
+    const emulator = window.EJS_emulator;
+    if (!emulator) throw new Error("Emulator not initialized");
+
+    const stateKey = emulator.getBaseFileName() + ".state";
+    const state = await emulator.storage.states.get(stateKey);
+    if (state) {
+      await emulator.gameManager.loadState(state);
+      console.log("Loaded from Browser Storage:", stateKey);
+    } else {
+      alert("No saved state found in browser storage.");
+    }
+  } catch (err) {
+    console.error("Load error:", err);
+    alert(`Load error: ${err.message}`);
+  }
+};
+
+// ====== LOAD HANDLER: From File ======
+document.getElementById("loadFile").onclick = () => {
+  loadDialog.style.display = "none";
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".state";
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const buffer = await file.arrayBuffer();
+        await window.EJS_emulator.gameManager.loadState(new Uint8Array(buffer));
+        console.log("Loaded state from file.");
+      } catch (error) {
+        console.error("Load error:", error);
+        alert("Error loading file.");
+      }
+    }
+  };
+  input.click();
+};
+
+// ====== LOAD HANDLER: Memory Card 1 ======
+// ====== LOAD HANDLER (Memory Card 1) ======
+document.getElementById("loadMem1").onclick = async () => {
+  loadDialog.style.display = 'none';
+  try {
+    const emulator = window.EJS_emulator;
+    const profile  = localStorage.getItem("activeProfile") || "Guest";
+    const baseName = emulator.getBaseFileName();
+    const fileName = `${profile}-${baseName}`;
+
+    // Fetch wrapped data
+    const res = await fetch(`/emulator/Mem1/${encodeURIComponent(fileName)}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Error fetching save (${res.status})`);
+    const text = await res.text();
+
+    // Extract Base64 from [[[â€¦]]]
+    const match = text.match(/\[\[\[([\s\S]*?)\]\]\]/);
+    if (!match) throw new Error("Save data malformed");
+
+    // Decode Base64 â†’ Uint8Array
+    const binary = atob(match[1]);
+    const len    = binary.length;
+    const buffer = new Uint8Array(len);
+    for (let i = 0; i < len; i++) buffer[i] = binary.charCodeAt(i);
+
+    await emulator.gameManager.loadState(buffer);
+  } catch (err) {
+    console.error("Load error:", err);
+    alert(`Load error: ${err.message}`);
+  }
+};
+
+
+// ====== LOAD HANDLER: Memory Card 2 ======
+// ====== LOAD HANDLER (Memory Card 2) ======
+document.getElementById("loadMem2").onclick = async () => {
+  loadDialog.style.display = 'none';
+  try {
+    const emulator = window.EJS_emulator;
+    const profile  = localStorage.getItem("activeProfile") || "Guest";
+    const baseName = emulator.getBaseFileName();
+    const fileName = `${profile}-${baseName}`;
+
+    // Fetch wrapped data
+    const res = await fetch(`/emulator/Mem2/${encodeURIComponent(fileName)}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Error fetching save (${res.status})`);
+    const text = await res.text();
+
+    // Extract Base64 from [[[â€¦]]]
+    const match = text.match(/\[\[\[([\s\S]*?)\]\]\]/);
+    if (!match) throw new Error("Save data malformed");
+
+    // Decode Base64 â†’ Uint8Array
+    const binary = atob(match[1]);
+    const len    = binary.length;
+    const buffer = new Uint8Array(len);
+    for (let i = 0; i < len; i++) buffer[i] = binary.charCodeAt(i);
+
+    await emulator.gameManager.loadState(buffer);
+  } catch (err) {
+    console.error("Load error:", err);
+    alert(`Load error: ${err.message}`);
+  }
+};
+
+
+// ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Active Profile Icon ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
+(function() {
+  const activeProfile = localStorage.getItem("activeProfile") || "Guest";
+  const img = document.createElement("img");
+  img.src = `./Profiles/${activeProfile}.jpg`;
+  img.alt = activeProfile;
+  img.width = 27; img.height = 26;
+img.id = "activeProfileIcon";
+
+// Add click listener to trigger save then redirect
+img.addEventListener('click', async () => {
+  try {
+    const emulator = window.EJS_emulator;
+    const state = emulator?.gameManager?.getState();
+
+    if (state) {
+      const stateKey = emulator.getBaseFileName() + ".state";
+      await emulator.storage.states.put(stateKey, state);
+      showSavedIndicator(); // optional visual feedback
+    }
+  } catch (err) {
+    console.warn("Save to browser storage failed. Proceeding to profiles page...");
+  } finally {
+    // Always redirect regardless of save success
+    window.location.href = "../Game-profiles.html";
+  }
+});
+// ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢
+ // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Add this line
+  Object.assign(img.style, {
+    position: "fixed",
+    borderRadius: "4px",
+    boxShadow: "0 0 4px rgba(0,0,0,0.5)",
+    zIndex: "10000"
+  });
+  requestAnimationFrame(() => {
+    const rect = loadButton.getBoundingClientRect();
+    img.style.top  = `${rect.top + (rect.height - img.height)/2}px`;
+    img.style.left = `${rect.right + 1}px`;
+  });
+  document.body.appendChild(img);
+})();
+
+function showSavedIndicator() {
+  const profileImg = document.getElementById("activeProfileIcon");
+  if (!profileImg) return;
+
+  // Remove old indicator if it's still there
+  const existing = document.getElementById("savedIndicator");
+  if (existing) existing.remove();
+
+  const indicator = document.createElement("div");
+  indicator.id = "savedIndicator";
+  indicator.style.cssText = `
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    background: #00cc66;
+    border-radius: 50%;
+    z-index: 10001;
+  `;
+
+  // Position it to the right of the profile icon
+  const rect = profileImg.getBoundingClientRect();
+  indicator.style.top = `${rect.top + 8}px`;
+  indicator.style.left = `${rect.right + 5}px`;
+
+  document.body.appendChild(indicator);
+
+  // Remove after 2.5 seconds
+  setTimeout(() => {
+    indicator.remove();
+  }, 2500);
+}
+// Fast Forward Button Implementation
+const fastForwardButton = document.createElement("a");
+fastForwardButton.href = "#";
+fastForwardButton.innerHTML = "Fast";
+Object.assign(fastForwardButton.style, {
+    position: "fixed",
+    top: "36px",
+    right: "5px",
+    zIndex: "9999",
+    padding: "3px 8px",
+    background: "#6A5F7D", // Initial color (off)
+    color: "white",
+    borderRadius: "3px",
+    textDecoration: "none",
+    fontFamily: "Arial, sans-serif",
+    fontWeight: "bold",
+    boxShadow: "0 2px 2px rgba(0,0,0,0.3)",
+    cursor: "pointer"
+});
+
+let isFastForwardActive = false;
+
+function toggleFastForward() {
+    if (!window.EJS_emulator?.gameManager) return;
+    
+    // Toggle the state
+    isFastForwardActive = !isFastForwardActive;
+    
+    // Update the emulator state
+    window.EJS_emulator.gameManager.toggleFastForward(isFastForwardActive);
+    
+    // Update button appearance
+    fastForwardButton.style.background = isFastForwardActive ? "#FFD700" : "#6A5F7D";
+    console.log(`Fast Forward ${isFastForwardActive ? "ENABLED" : "DISABLED"}`);
+}
+
+fastForwardButton.addEventListener("click", (e) => {
+    e.preventDefault();
+    toggleFastForward();
+});
+
+document.body.appendChild(fastForwardButton);
+
+
+
+                
+// Netplay State
+let netplayMode = null; // null, "hosting", or "joining"
+let linkTradeEnabled = false;
+let sharedConsoleEnabled = false;
+
+// Netplay Button (Far Left)
+const netplayButton = document.createElement("a");
+netplayButton.href = "#";
+netplayButton.innerText = "Netplay";
+Object.assign(netplayButton.style, {
+    position: "fixed",
+    top: "36px",
+    left: "5px",
+    zIndex: "9999",
+    padding: "3px 8px",
+    background: "#6A5F7D",
+    color: "white",
+    borderRadius: "3px",
+    textDecoration: "none",
+    fontFamily: "Arial, sans-serif",
+    fontWeight: "bold",
+    boxShadow: "0 2px 2px rgba(0,0,0,0.3)",
+    cursor: "pointer"
+});
+
+// Status Square (next to Netplay button)
+const netplayStatus = document.createElement("div");
+Object.assign(netplayStatus.style, {
+    position: "fixed",
+    top: "36px",
+    left: "90px",
+    width: "16px",
+    height: "16px",
+    background: "transparent",
+    borderRadius: "3px",
+    zIndex: "9999",
+    boxShadow: "0 2px 2px rgba(0,0,0,0.3)"
+});
+document.body.appendChild(netplayStatus);
+
+// Netplay Dialog
+const netplayDialog = document.createElement("div");
+Object.assign(netplayDialog.style, {
+    position: "fixed",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    background: "#333",
+    padding: "20px",
+    borderRadius: "8px",
+    border: "2px solid #555",
+    zIndex: "10000",
+    display: "none",
+    boxShadow: "0 0 15px rgba(0,0,0,0.5)",
+    color: "#ddd",
+    fontFamily: "monospace",
+    textAlign: "center"
+});
+netplayDialog.innerHTML = `
+    <div style="text-align: center; color: #aaa; margin-bottom: 15px; font-family: monospace;">
+        Choose Netplay Mode
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 10px;">
+        <button id="hostBtn" style="
+            background: #4E89AE;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+        ">Host</button>
+        <button id="joinBtn" style="
+            background: #5F7D6A;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+        ">Join</button>
+        <button id="toggleLink" style="
+            background: #6A5F7D;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+        ">Link Trade Cable</button>
+        <button id="toggleShared" style="background: #FFD700; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-family: monospace;"style="background: #FFFACD; color: black; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-family: monospace;">Shared Console</button>
+    </div>
+    <div style="margin-top: 15px;">
+        <button id="disconnectBtn" style="
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-family: monospace;
+            cursor: pointer;
+        ">Disconnect</button>
+    </div>
+`;
+document.body.appendChild(netplayDialog);
+
+// Close Button for Dialog
+const netplayClose = document.createElement("button");
+netplayClose.innerHTML = "&times;";
+Object.assign(netplayClose.style, {
+    position: "absolute",
+    top: "-5px",
+    right: "10px",
+    background: "transparent",
+    border: "none",
+    color: "white",
+    fontSize: "20px",
+    cursor: "pointer"
+});
+netplayDialog.appendChild(netplayClose);
+
+// Handlers
+netplayButton.onclick = (e) => {
+    e.preventDefault();
+    netplayDialog.style.display = "block";
+};
+
+netplayClose.onclick = () => {
+    netplayDialog.style.display = "none";
+};
+document.getElementById("disconnectBtn").onclick = () => resetNetplay();
+
+document.getElementById("hostBtn").onclick = () => {
+    netplayMode = "hosting";
+    updateNetplayVisuals();
+};
+
+document.getElementById("joinBtn").onclick = () => {
+    netplayMode = "joining";
+    updateNetplayVisuals();
+};
+
+document.getElementById("toggleLink").onclick = () => {
+    linkTradeEnabled = !linkTradeEnabled;
+    sharedConsoleEnabled = false;
+    updateNetplayVisuals();
+};
+
+document.getElementById("toggleShared").onclick = () => {
+    sharedConsoleEnabled = !sharedConsoleEnabled;
+    linkTradeEnabled = false;
+    updateNetplayVisuals();
+};
+
+// Visual Updater
+function updateNetplayVisuals() {
+    if (netplayMode === "hosting") {
+        netplayButton.innerText = "Hosting";
+        netplayButton.style.background = "#4E89AE";
+    } else if (netplayMode === "joining") {
+        netplayButton.innerText = "Joining";
+        netplayButton.style.background = "#5F7D6A";
+    } else {
+        netplayButton.innerText = "Netplay";
+        netplayButton.style.background = "#6A5F7D";
+    }
+
+    if (netplayMode) {
+    let primaryColor = netplayMode === "hosting" ? "blue" : "green";
+    if (linkTradeEnabled) {
+        netplayStatus.style.background = `linear-gradient(to right, ${primaryColor} 50%, purple 50%)`;
+    } else if (sharedConsoleEnabled) {
+        netplayStatus.style.background = `linear-gradient(to right, ${primaryColor} 50%, yellow 50%)`;
+    } else {
+        netplayStatus.style.background = primaryColor;
+    }
+} else {
+    netplayStatus.style.background = "transparent";
+}
+}
+
+// Reset Function
+function resetNetplay() {
+    netplayDialog.style.display = "none";
+    netplayMode = null;
+    linkTradeEnabled = false;
+    sharedConsoleEnabled = false;
+    updateNetplayVisuals();
+}
+
+document.body.appendChild(netplayButton);
+// Guidebook Button 00000000000
+const guideButton = document.createElement("a");
+guideButton.innerHTML  = "&#x1F56E;";
+Object.assign(guideButton.style, {
+    position: "fixed",
+    top: "36px",
+    right: `56px`,
+    zIndex: "9999",
+    padding: "1px 2px",
+    background: "transparent",
+    color: "white",
+    border: "1px solid white",
+    borderRadius: "2px",
+    textDecoration: "none",
+    fontFamily: "Arial, sans-serif",
+    fontSize: "16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 2px 2px rgba(0,0,0,0.3)",
+    cursor: "pointer"
+});
+guideButton.addEventListener("click", (e) => {
+    e.preventDefault();
+    const rom = romParam.split('?')[0];
+    const base = rom.split('.')[0];
+const url = `http://${serverIP}/guidebooks.html?Guidebook=${base}Guidebook`;
+    const iframe = document.getElementById("guideIframe");
+    iframe.src = url;
+    document.getElementById("guideContainer").style.display = "block";
+});
+document.body.appendChild(guideButton);
+
+// Guidebook Iframe Container
+const guideContainer = document.createElement("div");
+guideContainer.id = "guideContainer";
+Object.assign(guideContainer.style, {
+    display: "none",
+    position: "fixed",
+    top: "1%",
+    left: "1%",
+    width: "98%",
+    height: "98%",
+    background: "rgba(0,0,0,0.8)",
+    zIndex: "10001"
+});
+const guideIframe = document.createElement("iframe");
+guideIframe.id = "guideIframe";
+Object.assign(guideIframe.style, {
+    width: "100%",
+    height: "100%",
+    border: "none",
+    borderRadius: "8px"
+});
+// â€”â€”â€” Guidebook â€”â€”â€”
+guideContainer.appendChild(guideIframe);
+
+// 1) Make the container transparent
+guideContainer.style.background = "transparent";
+
+// 2) Allow the iframe to render with a transparent background
+guideIframe.style.background = "transparent";
+guideIframe.setAttribute("allowTransparency", "true");
+
+const closeGuide = document.createElement("button");
+closeGuide.textContent = "";
+
+Object.assign(closeGuide.style, {
+  position:    "absolute",
+  top:         "-5px",
+  right:       "13px",
+  width:       "28px",
+  height:      "28px",
+  fontSize:    "16px",
+  lineHeight:  "28px",
+  textAlign:   "center",
+  background:  "transparent",  // button itself is transparent
+  color:       "#fff",
+  border:      "none",
+  borderRadius:"4px",
+  cursor:      "pointer",
+  zIndex:      "10002"
+});
+
+closeGuide.addEventListener("click", () => {
+  guideContainer.style.display = "none";
+  guideIframe.src = "";
+});
+
+guideContainer.appendChild(closeGuide);
+document.body.appendChild(guideContainer);
+// â€”â€”â€” DROPâ€‘IN REPLACEMENT END â€”â€”â€”
+// â€”â€”â€” DROPâ€‘IN REPLACEMENT END â€”â€”â€”
+// â€”â€”â€” DROPâ€‘IN REPLACEMENT END â€”â€”â€”
+// Fullscreen Button
+                const fullscreenButton = document.createElement("a");
+                fullscreenButton.href = "#";
+                fullscreenButton.innerText = "Fullscreen";
+                fullscreenButton.style.cssText = `
+                    position: fixed;
+                    top: 5px;
+                    right: 5px;
+                    z-index: 9999;
+                    padding: 3px 3px;
+                    background: #6A5F7D;
+                    color: white;
+                    border-radius: 3px;
+                    text-decoration: none;
+                    font-family: Arial, sans-serif;
+                    font-weight: bold;
+                    box-shadow: 0 2px 2px rgba(0,0,0,0.3);
+                `;
+                fullscreenButton.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen()
+                            .then(() => fullscreenButton.innerText = 'Exit Fullscreen')
+                            .catch(console.error);
+                    } else {
+                        document.exitFullscreen()
+                            .then(() => fullscreenButton.innerText = 'Fullscreen')
+                            .catch(console.error);
+                    }
+                });
+                document.body.appendChild(fullscreenButton);
+            };
+            document.body.appendChild(script);
+        };
+    </script>
+	</body>
+</html>
