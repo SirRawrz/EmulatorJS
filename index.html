@@ -106,6 +106,341 @@
             <h1>EmulatorJS Demo</h1>
             <img src="docs/Logo-light.png" alt="Logo" class="logo">
         </div>
+
+<script>
+// Auto-start when URL contains ?rom=FILENAME — ensure it works similarly to indexps1.html
+(function(){
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const rom = urlParams.get('rom');
+    if (!rom) return;
+    // try to read serverip.txt to compose remote URL
+    fetch('serverip.txt',{cache:'no-store'}).then(r=>r.ok?r.text():null).then(txt=>{
+      const serverIP = (txt && txt.trim())? txt.trim() : 'localhost:8080';
+      const gameUrl = 'http://' + serverIP + '/emulator/roms/' + encodeURIComponent(rom) + '?t=' + Date.now();
+      const biosUrl  = 'http://' + serverIP + '/emulator/SCPH1001.BIN';
+      // wait for createEmulatorContainerAndLoad if not yet defined
+      function tryCreate(){
+        if (typeof createEmulatorContainerAndLoad === 'function') {
+          createEmulatorContainerAndLoad({ gameName: rom, gameUrl: gameUrl, core: 'psx', biosUrl: biosUrl });
+        } else {
+          setTimeout(tryCreate, 150);
+        }
+      }
+      tryCreate();
+    }).catch(()=>{});
+  } catch(e){}
+})();
+</script>
+<!-- BEGIN INJECTED CHOOSE-ROM / CORE UI (VISIBLE) -->
+<style id="ej-inject-style">
+#ej-chooser { max-width:900px; margin:12px auto; padding:12px; background:#111; color:#eee; border:1px solid #333; border-radius:8px; font-family:monospace; }
+#ej-chooser .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+#ej-chooser input[type=file] { display:block; }
+#ej-chooser select, #ej-chooser button, #ej-chooser input[type=text] { padding:6px 8px; font-family:monospace; border-radius:6px; background:#222; color:#eee; border:1px solid #444; }
+#ej-chooser #ej-box-text { margin-bottom:8px; color:#9a9a9a; }
+</style>
+<div id="ej-chooser" aria-label="EmulatorJS chooser">
+  <div id="ej-box-text">Choose a ROM file or paste a remote ROM URL. Select the core then click Load game.</div>
+  <div class="row">
+    <input id="ej-file" type="file" />
+    <label for="ej-core">Core:</label>
+    <select id="ej-core">
+      <option value="psx">psx</option>
+      <option value="gba">gba</option>
+      <option value="arcade">arcade</option>
+      <option value="gb">gb</option>
+      <option value="psp">psp</option>
+      <option value="n64">n64</option>
+      <option value="nds">nds</option>
+      <option value="sega">sega</option>
+      <option value="atari">atari</option>
+    </select>
+    <button id="ej-load">Load game</button>
+    <input id="ej-remote" type="text" placeholder="remote rom filename or URL (optional)" style="min-width:260px;"/>
+  </div>
+  <div style="margin-top:8px;color:#888;font-size:13px;">Tip: For remote ROMs use <code>?rom=FILENAME</code> or enter a filename/URL above and press Load.</div>
+</div>
+<!-- END INJECTED CHOOSE-ROM / CORE UI (VISIBLE) -->
+
+<script>
+window.createEmulatorContainerAndLoad = function(opts) {
+  try {
+    // remove existing UI sections if present
+    try { var top = document.getElementById('top'); if (top) top.remove(); } catch(e){}
+    try { var version = document.getElementById('version'); if (version) version.remove(); } catch(e){}
+    try { var box = document.getElementById('box'); if (box) box.remove(); } catch(e){}
+    try { var chooser = document.getElementById('ej-chooser'); if (chooser) chooser.remove(); } catch(e){}
+
+    // create display container
+    var div = document.createElement('div'); div.id = 'display';
+    var sub = document.createElement('div'); sub.id = 'game';
+    div.appendChild(sub);
+    document.body.appendChild(div);
+
+    // set global EJS variables
+    window.EJS_player = '#game';
+    window.EJS_gameName = opts.gameName || (opts.gameUrl && (typeof opts.gameUrl === 'string' ? opts.gameUrl.split('/').pop() : (opts.gameUrl.name || 'unknown')));
+    if (opts.gameUrl !== undefined) window.EJS_gameUrl = opts.gameUrl;
+    if (opts.biosUrl) window.EJS_biosUrl = opts.biosUrl;
+    window.EJS_core = opts.core || 'psx';
+    window.EJS_pathtodata = window.cdn || 'data/';
+    window.EJS_startOnLoaded = true;
+    if (window.language && window.language !== 'auto') window.EJS_language = window.language;
+    if (opts.core === 'psp') window.EJS_threads = true;
+
+    // optional ready hook
+    window.EJS_ready = function() {
+      if (typeof detectAdBlock === 'function') {
+        try {
+          detectAdBlock("data:text/html;base64,DQo8aHRtbD48c3R5bGU+I2FkYmxvY2t7YmFja2dyb3VuZC1jb2xvcjpyZ2JhKDAsMCwwLC44KTtwb3NpdGlvbjpmaXhlZDt3aWR0aDoxMDAlO2hlaWdodDoxMDAlO3RvcDowO2xlZnQ6MDt6LWluZGV4OjEwMDA7dGV4dC1hbGlnbjpjZW50ZXI7Y29sb3I6I2ZmZn1ib2R5LGh0bWx7YmFja2dyb3VuZC1jb2xvcjp0cmFuc3BhcmVudH1hIHtjb2xvcjogIzAwYWZlNDt9PC9zdHlsZT48Ym9keSBzdHlsZT0ibWFyZ2luOjAiPjxkaXYgaWQ9ImFkYmxvY2siPjxoMT5IaSBBZGJsb2NrIFVzZXIhPC9oMT48cD5BZHMgb24gdGhpcyBwYWdlIG1heSBjb21lIGFuZCBnbyBkZXBlbmRpbmcgb24gaG93IG1hbnkgcGVvcGxlIGFyZSBmdW5kaW5nIHRoaXMgcHJvamVjdC48YnI+WW91IGNhbiBoZWxwIGZ1bmQgdGhpcyBwcm9qZWN0IG9uIDxhIHRhcmdldD0iX2Fib3V0IiBocmVmPSJodHRwczovL3BhdHJlb24uY29tL0VtdWxhdG9ySlMiPnBhdHJlb248L2E+PC9wPjwvZGl2PjwvYm9keT48L2h0bWw+");
+        } catch(e){}
+      }
+    };
+
+    // Append loader script
+    var script = document.createElement('script');
+    script.src = (location.origin + '/' + 'data/loader.js').replace(/([^:])\/\/+/g,'$1/');
+    script.onerror = function() {
+      var cdn = window.cdn || 'https://cdn.emulatorjs.org/stable/data/';
+      var s2 = document.createElement('script');
+      s2.src = (cdn.endsWith('/')?cdn:cdn+'/') + 'loader.js';
+      document.body.appendChild(s2);
+    };
+    document.body.appendChild(script);
+  } catch(err) {
+    console.error('createEmulatorContainerAndLoad error', err);
+  }
+};
+</script>
+<script id="ej-inject-script">
+(function(){
+  function runChooser() {
+
+(function(){
+  // helper to infer core
+  function inferCoreFromExt(ext){
+    ext = (ext||'').toLowerCase();
+    if (['fds','nes','unif','unf'].includes(ext)) return 'nes';
+    if (['smc','sfc','fig','gd3','gd7','dx2','bsx','swc'].includes(ext)) return 'snes';
+    if (['z64','n64'].includes(ext)) return 'n64';
+    if (['pce'].includes(ext)) return 'pce';
+    if (['nds','gba','gb','gbc'].includes(ext)) return ext;
+    if (['chd','iso','bin'].includes(ext)) return 'psx';
+    return null;
+  }
+
+  const fileInput = document.getElementById('ej-file');
+  const coreSelect = document.getElementById('ej-core');
+  const loadBtn = document.getElementById('ej-load');
+  const remoteInput = document.getElementById('ej-remote');
+  const boxText = document.getElementById('ej-box-text');
+
+  let pendingFile = null;
+  fileInput.addEventListener('change', function(e){
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    pendingFile = f;
+    const parts = f.name.split('.');
+    const ext = parts.length>1 ? parts.pop() : '';
+    const inferred = inferCoreFromExt(ext);
+    if (inferred && Array.from(coreSelect.options).some(o=>o.value===inferred)) coreSelect.value = inferred;
+    boxText.textContent = 'Selected: ' + f.name;
+    remoteInput.value = '';
+  });
+
+  loadBtn.addEventListener('click', function(){
+    const core = coreSelect.value || 'psx';
+    // If remote input supplied and looks like filename/URL, load remote
+    const remoteVal = (remoteInput.value||'').trim();
+    if (remoteVal) {
+      // if remote appears to be a URL with rom= param extract filename
+      let filename = remoteVal;
+      try{
+        const u = new URL(remoteVal);
+        // if there's rom param use it
+        const p = new URLSearchParams(u.search);
+        if (p.get('rom')) filename = p.get('rom');
+        else filename = u.pathname.split('/').pop();
+      } catch(e){
+        // not a URL - treat as filename
+        filename = remoteVal.split(/[\\/]/).pop();
+      }
+      // attempt to read server IP from serverip.txt via fetch, fallback to original sample
+      fetch('serverip.txt',{cache:'no-store'}).then(r=>r.ok?r.text():null).then(txt=>{
+        const serverIP = (txt && txt.trim())? txt.trim() : '192.168.0.32:8000';
+        const gameUrl = 'http://' + serverIP + '/emulator/roms/' + encodeURIComponent(filename) + '?t=' + Date.now();
+        const biosUrl = (core==='psx') ? 'http://' + serverIP + '/emulator/SCPH1001.BIN' : '';
+        createEmulatorContainerAndLoad({ gameName: filename, gameUrl: gameUrl, core: core, biosUrl: biosUrl });
+      }).catch(()=> {
+        const serverIP = '192.168.0.32:8000';
+        const gameUrl = 'http://' + serverIP + '/emulator/roms/' + encodeURIComponent(filename) + '?t=' + Date.now();
+        const biosUrl = (core==='psx') ? 'http://' + serverIP + '/emulator/SCPH1001.BIN' : '';
+        createEmulatorContainerAndLoad({ gameName: filename, gameUrl: gameUrl, core: core, biosUrl: biosUrl });
+      });
+      return;
+    }
+
+    // Otherwise if a local file selected, use File/Blob
+    if (pendingFile) {
+      const threads = (core === 'psp');
+      createEmulatorContainerAndLoad({ gameName: pendingFile.name, gameUrl: pendingFile, core: core, biosUrl: '', threads: threads });
+      return;
+    }
+
+    alert('Please either choose a local ROM file or enter a remote filename/URL and try again.');
+  });
+
+  // Paste support: allow pasting a URL/filename into remote input
+  document.addEventListener('paste', function(e){
+    try{
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      if (!text) return;
+      if (text.match(/rom=/i) || text.match(/\.(chd|iso|bin|zip|gba|gb|nes|sfc|smc|z64|n64|nds)$/i)) {
+        remoteInput.value = text;
+        boxText.textContent = 'Detected remote entry in clipboard. Click Load game to load it.';
+      }
+    }catch(e){}
+  });
+
+})();
+
+  } // end runChooser
+
+  if (typeof createEmulatorContainerAndLoad === 'function') {
+    runChooser();
+  } else {
+    // Poll for the function for up to ~5 seconds
+    var attempts = 0;
+    var maxAttempts = 50;
+    var poll = setInterval(function(){
+      if (typeof createEmulatorContainerAndLoad === 'function') {
+        clearInterval(poll);
+        runChooser();
+      } else if (++attempts >= maxAttempts) {
+        clearInterval(poll);
+        console.error('createEmulatorContainerAndLoad not found after waiting — chooser may not function.'); 
+        // degrade gracefully: disable load button and inform user
+        try {
+          var b = document.getElementById('ej-load');
+          if (b) { b.disabled = true; b.title = 'Loader not ready'; }
+        } catch(e){}
+      }
+    }, 100);
+  }
+})();
+</script>
+
+    <script>
+    // Persistent UI buttons: create them immediately on page load and avoid duplicates.
+    (function(){
+        if (window._ej_persistentButtonsCreated) return;
+        window._ej_persistentButtonsCreated = true;
+
+        // helper to create button if not exists
+        function makeBtn(id, text, styleCss, clickHandler){
+            if (document.getElementById(id)) return document.getElementById(id);
+            const a = document.createElement('a');
+            a.id = id;
+            a.href = '#';
+            a.innerText = text;
+            a.style.cssText = styleCss;
+            a.addEventListener('click', function(e){
+                if (clickHandler) {
+                    try { clickHandler(e); } catch(err){ console.warn('button handler error', err); }
+                } else e.preventDefault();
+            });
+            document.body.appendChild(a);
+            return a;
+        }
+
+        // basic styles used (kept compact)
+        const baseStyle = 'position: fixed; z-index: 9999; padding: 3px 6px; color: white; border-radius: 3px; text-decoration: none; font-family: Arial, sans-serif; font-weight: bold; box-shadow: 0 2px 2px rgba(0,0,0,0.3);';
+
+        // Home (left)
+        makeBtn('ej-home-button','Home', baseStyle + 'top:5px; left:5px; background:#ff4444;', function(){ window.location.href = './index.html'; });
+
+        // Save (left next to Home) - if emulator not ready, show a small notice
+        makeBtn('ej-save-button','Save', baseStyle + 'top:5px; left:60px; background:#6A5F7D;', function(e){
+            e.preventDefault();
+            // prefer existing save button or dialog if present
+            const btn = document.querySelector('a[innerText="Save"], a#saveButton, a.saveButton');
+            if (window.EJS_emulator && window.EJS_emulator.gameManager && (typeof window.EJS_emulator.gameManager.getState === 'function')) {
+                // If the page has a save dialog trigger (created later), try to open it; else show a minimal save flow
+                const saveDialog = document.querySelector('div[style*="Choose Save Location"], #saveDialog, div#saveDialog');
+                if (saveDialog) { saveDialog.style.display = 'block'; return; }
+                // fallback: try to call emulator save to browser storage (best-effort)
+                try {
+                    const emulator = window.EJS_emulator;
+                    const st = emulator.gameManager.getState();
+                    const key = emulator.getBaseFileName() + '.state';
+                    emulator.storage.states.put(key, st).then(()=>{ console.log('Saved to browser storage', key); alert('Saved to browser storage'); }).catch(()=>{ alert('Save attempt failed'); });
+                    return;
+                } catch(err){
+                    console.warn('save fallback failed', err);
+                }
+            }
+            alert('Emulator not ready yet — save will be available after loading a ROM.');
+        }, function(e){
+            e.preventDefault();
+            const sd = document.getElementById('saveDialog');
+            if (sd) { sd.style.display = (sd.style.display === 'block') ? 'none' : 'block'; return; }
+            // fallback: try existing chooser save button
+            const chooserSave = document.querySelector('#ej-load');
+            if (chooserSave) { chooserSave.focus(); }
+            alert('Save dialog not available yet. Load a ROM first or use the chooser.');
+        });
+
+        // Load (opens chooser load or internal load dialog)
+        makeBtn('ej-load-button','Load', baseStyle + 'top:5px; left:115px; background:#5F7D6A;', function(e){
+            e.preventDefault();
+            // try to trigger existing chooser load button
+            const chooserLoad = document.getElementById('ej-load');
+            if (chooserLoad) { chooserLoad.click(); return; }
+            // try to open existing load dialog
+            const loadDialog = document.getElementById('loadDialog') || document.querySelector('div[style*="Choose Load Source"]');
+            if (loadDialog) { loadDialog.style.display = 'block'; return; }
+            alert('No load UI found yet — please use the chooser to select a ROM.');
+        }, function(e){
+            e.preventDefault();
+            const ld = document.getElementById('loadDialog');
+            if (ld) { ld.style.display = (ld.style.display === 'block') ? 'none' : 'block'; return; }
+            const chooserLoad = document.getElementById('ej-load');
+            if (chooserLoad) { chooserLoad.click(); return; }
+            alert('No load UI found yet — please use the chooser to select a ROM.');
+        });
+
+        // Fullscreen (right)
+        makeBtn('ej-fullscreen-button','Fullscreen', baseStyle + 'top:5px; right:5px; background:#6A5F7D;', function(e){
+            e.preventDefault();
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(()=>{});
+            } else {
+                document.exitFullscreen().catch(()=>{});
+            }
+        });
+
+        // Guidebook (right next to fullscreen) — keeps minimal functionality until full UI is present
+        makeBtn('ej-guide-button','\u{1F56E}', baseStyle + 'top:36px; right:56px; background:transparent; border:1px solid white; padding:1px 6px;');
+
+        // Netplay (left lower)
+        makeBtn('ej-netplay-button','Netplay', baseStyle + 'top:36px; left:5px; background:#6A5F7D; padding:3px 8px;');
+
+        // Fast forward (right lower)
+        makeBtn('ej-fast-button','Fast', baseStyle + 'top:36px; right:5px; background:#6A5F7D; padding:3px 8px;');
+
+        // Minimal indicator style support (if the real JS later uses showSavedIndicator, etc)
+        window.showSavedIndicator = window.showSavedIndicator || function(){
+            const indicator = document.createElement('div');
+            indicator.innerText = 'Saved';
+            indicator.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#4E89AE; color:white; padding:8px; border-radius:6px; z-index:100000;';
+            document.body.appendChild(indicator);
+            setTimeout(()=>indicator.remove(), 2000);
+        };
+
+    })();
+    </script>
+
     <script>
 	// save your server ip and port serverip.txt in emulator folder
 	
@@ -281,11 +616,15 @@ window.EJS_biosUrl = `http://${serverIP}/emulator/SCPH1001.BIN`;
             const script = document.createElement("script");
             script.src = "data/loader.js";
  script.onload = () => {
+                if (window._ej_persistentButtonsCreated) { console.log("Persistent UI already created — skipping duplicate UI creation."); }
+                else {
+
                 console.log("EmulatorJS Loaded");
                 
                 // Create Save Location Dialog
                 const saveDialog = document.createElement("div");
-                saveDialog.style.cssText = `
+                saveDialog.id = "saveDialog";
+saveDialog.style.cssText = `
                     position: fixed;
                     top: 50%;
                     left: 50%;
@@ -463,79 +802,11 @@ document.getElementById('saveMem2').onclick = async () => {
                     font-weight: bold;
                     box-shadow: 0 2px 2px rgba(0,0,0,0.3);
                 `;
-                saveButton.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    try {
-                        const emulator = window.EJS_emulator;
-                        const state = emulator.gameManager.getState();
-                        const screenshot = await emulator.gameManager.screenshot();
-                        
-       // Close button for save dialog
-const closeSaveDialogButton = document.createElement("button");
-closeSaveDialogButton.innerHTML = "&times;";
-closeSaveDialogButton.style.cssText = `
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: transparent;
-    border: none;
-    color: white;
-    font-size: 20px;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-`;
-saveDialog.appendChild(closeSaveDialogButton);
-
-closeSaveDialogButton.onclick = () => {
-    saveDialog.style.display = 'none';
-};
-
-// Show save location dialog
-saveDialog.style.display = 'block';
-                        
-                        // Browser storage handler
-                        document.getElementById('saveBrowser').onclick = async () => {
-    saveDialog.style.display = 'none';
-    try {
-        // Saving the game state to local storage
-        const stateKey = emulator.getBaseFileName() + ".state";
-        await emulator.storage.states.put(stateKey, state);
-        console.log("State saved to browser storage with key:", stateKey);
-  //      alert("State saved to browser storage!");
-    } catch (error) {
-        console.error("Browser save failed:", error);
-        alert("Error saving to browser storage!");
-    }
-};
-                        
-                        // File download handler
-                        document.getElementById('saveDownload').onclick = () => {
-                            saveDialog.style.display = 'none';
-                            try {
-                                const blob = new Blob([state]);
-                                const url = URL.createObjectURL(blob);
-                                const link = document.createElement("a");
-                                link.href = url;
-                                link.download = emulator.getBaseFileName() + ".state";
-                                link.click();
-                                URL.revokeObjectURL(url);
-                         //       alert("Save file downloading...");
-                            } catch (error) {
-                                console.error("Download failed:", error);
-                                alert("Error generating download!");
-                            }
-                        };
-                        
-                    } catch (error) {
-                        console.error("Save preparation failed:", error);
-                        alert("Error preparing save!");
-                    }
-                });
+                saveButton.addEventListener('click', (e)=>{ e.preventDefault(); const sd = document.getElementById('saveDialog'); if (sd) { sd.style.display = (sd.style.display==='block')? 'none':'block'; } });
                 document.body.appendChild(saveButton);
-
 // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Load Location Dialog ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
 const loadDialog = document.createElement("div");
+loadDialog.id = "loadDialog";
 Object.assign(loadDialog.style, {
   position: "fixed",
   top: "50%",
@@ -703,12 +974,8 @@ Object.assign(loadButton.style, {
   fontWeight: "bold",
   boxShadow: "0 2px 2px rgba(0,0,0,0.3)",
 });
-loadButton.addEventListener("click", (e) => {
-  e.preventDefault();
-  loadDialog.style.display = "block";
-});
+loadButton.addEventListener('click', (e)=>{ e.preventDefault(); const ld = document.getElementById('loadDialog'); if (ld) { ld.style.display = (ld.style.display==='block')? 'none':'block'; } });
 document.body.appendChild(loadButton);
-
 // ====== LOAD HANDLER: Browser Storage ======
 document.getElementById("loadBrowser").onclick = async () => {
   loadDialog.style.display = "none";
@@ -1250,7 +1517,9 @@ document.body.appendChild(guideContainer);
                     } else {
                         document.exitFullscreen()
                             .then(() => fullscreenButton.innerText = 'Fullscreen')
-                            .catch(console.error);
+ 
+                }
+                           .catch(console.error);
                     }
                 });
                 document.body.appendChild(fullscreenButton);
