@@ -1566,8 +1566,106 @@ window.joinWebRTC = async function joinWebRTC(sessionId) {
           border: '0', background: '#000', objectFit: 'contain', pointerEvents: 'none', userSelect: 'none'
         });
         const overlay = makeEl('div', { id: 'netplayOverlay' }, { position: 'fixed', left: '0', top: '0', width: '100vw', height: '100vh', zIndex: 100002, background: 'transparent', cursor: 'default', pointerEvents: 'auto' });
-        overlay.addEventListener('dblclick', async (ev) => { ev.preventDefault(); try { if (!document.fullscreenElement) await video.requestFullscreen(); else await document.exitFullscreen(); } catch(e){} });
-        overlay.addEventListener('contextmenu', (e)=>e.preventDefault());
+		// --- Replace the overlay dblclick fullscreen handler with this ---
+overlay.addEventListener('dblclick', async (ev) => {
+  ev.preventDefault();
+  try {
+    // ensure the top-left UI clone exists (uses your existing helper)
+    try { installTopLeftUIClone(); } catch (err) { console.warn('installTopLeftUIClone failed', err); }
+
+    // find or create a fullscreen container
+    let fsContainer = document.getElementById('netplayFullscreenContainer');
+    const originalParent = video.parentElement;
+    const originalNext = video.nextSibling;
+
+    if (!fsContainer) {
+      fsContainer = document.createElement('div');
+      fsContainer.id = 'netplayFullscreenContainer';
+      Object.assign(fsContainer.style, {
+        position: 'fixed',
+        left: '0', top: '0', width: '100vw', height: '100vh',
+        zIndex: 100000, background: '#000', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+        pointerEvents: 'auto'
+      });
+
+      // ensure the video fits inside container
+      video.style.position = 'relative';
+      video.style.width = '100%';
+      video.style.height = '100%';
+      video.style.objectFit = 'contain';
+      video.style.pointerEvents = 'none'; // keep UI clickable over video
+
+      // append video into container
+      fsContainer.appendChild(video);
+
+      // append the cloned top-left UI (if present); installTopLeftUIClone creates #netplayUIContainer
+      const uiClone = document.getElementById('netplayUIContainer');
+      if (uiClone) {
+        // keep UI on top
+        uiClone.style.zIndex = 100001;
+        // ensure it stays positioned within the fullscreen container
+        fsContainer.appendChild(uiClone);
+      }
+
+      document.body.appendChild(fsContainer);
+    } else {
+      // If container exists but video is not inside, move it there
+      if (video.parentElement !== fsContainer) fsContainer.appendChild(video);
+      // make sure UI clone is present and on top
+      const uiClone = document.getElementById('netplayUIContainer');
+      if (uiClone && uiClone.parentElement !== fsContainer) fsContainer.appendChild(uiClone);
+    }
+
+    // Listen for fullscreen changes so we can restore the DOM when exiting
+    const onFsChange = () => {
+      if (!document.fullscreenElement) {
+        // move video back to original parent/location
+        try {
+          if (originalParent) {
+            if (originalNext) originalParent.insertBefore(video, originalNext);
+            else originalParent.appendChild(video);
+            // restore any inline styles you prefer
+            video.style.position = 'fixed';
+            video.style.left = '0';
+            video.style.top = '0';
+            video.style.width = '100vw';
+            video.style.height = '100vh';
+            video.style.objectFit = 'contain';
+            video.style.pointerEvents = 'none';
+          }
+        } catch (err) { console.warn('restore video failed', err); }
+
+        // move ui clone back into document.body (installTopLeftUIClone can recreate it if needed)
+        try {
+          const uiClone = document.getElementById('netplayUIContainer');
+          if (uiClone && uiClone.parentElement !== document.body) document.body.appendChild(uiClone);
+        } catch (err) {}
+
+        // remove container if empty
+        try {
+          const fs = document.getElementById('netplayFullscreenContainer');
+          if (fs && fs.childElementCount === 0) fs.remove();
+        } catch (err) {}
+
+        document.removeEventListener('fullscreenchange', onFsChange);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+
+    // toggle fullscreen on the container (not on the video element)
+    if (!document.fullscreenElement) {
+      await fsContainer.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  } catch (e) {
+    console.error('netplay fullscreen toggle error', e);
+    // fallback: try video fullscreen as last resort
+    try { if (!document.fullscreenElement) await video.requestFullscreen(); else await document.exitFullscreen(); } catch(err) {}
+  }
+});
+	   overlay.addEventListener('contextmenu', (e)=>e.preventDefault());
         document.body.appendChild(video); document.body.appendChild(overlay);
         try { installTopLeftUIClone(); } catch(e) {}
       } else {
