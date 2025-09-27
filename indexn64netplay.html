@@ -1024,6 +1024,22 @@ fastForwardButton.addEventListener("click", (e) => {
 });
 
 document.body.appendChild(fastForwardButton);
+// --- paste this near the top of the Netplay / WebRTC block (before any alert() calls) ---
+function ejsNotify(msg) {
+  try {
+    // prefer the emulator displayMessage if available
+    if (window.EJS_emulator && typeof window.EJS_emulator.displayMessage === 'function') {
+      // keep it short & plain text
+      window.EJS_emulator.displayMessage(String(msg));
+      return;
+    }
+  } catch (e) {
+    // ignore display errors
+  }
+  // fallback: console so nothing blocks fullscreen
+  console.warn('ejsNotify:', msg);
+}
+// ------------------------------------------------------------------
 
 <!-- START: Unified Netplay UI + WebRTC implementation (replace previous Netplay block entirely) -->
 
@@ -1117,7 +1133,7 @@ document.body.appendChild(fastForwardButton);
         try { window.EJS_emulator.gameManager.toggleFastForward(isFast); } catch (e) { console.warn(e); }
         ff.style.background = isFast ? '#FFD700' : '#6A5F7D';
       } else {
-        alert('Fast-forward not supported by this emulator build.');
+        ejsNotify('Fast-forward not supported by this emulator build.');
       }
     }
     ff.addEventListener('click', (e) => { e.preventDefault(); toggleFast(); });
@@ -1355,7 +1371,7 @@ const lastSeqForSlot = {};
           npw._connectedJoiners = (npw._connectedJoiners || 0) + 1;
           console.log('[netplay-shim] joiner connected -> total connected joiners =', npw._connectedJoiners);
           if (npw._connectedJoiners >= (clampedPlayers - 1)) {
-            try { alert(`All ${clampedPlayers} players have joined (connected ${npw._connectedJoiners} joiner(s)).`); } catch(e){}
+            try { ejsNotify(`All ${clampedPlayers} players have joined (connected ${npw._connectedJoiners} joiner(s)).`); } catch(e){}
           }
         }
       };
@@ -2126,7 +2142,7 @@ window.leaveWebRTC = async function leaveWebRTC() {
       // Start hosting with requested players
       try {
         await window.startHostWebRTC(sid, { fps: 48, players });
-        alert(`Hosting session "${sid}" for ${players} players.`);
+        ejsNotify(`Hosting session "${sid}" for ${players} players.`);
       } catch (e) {
         console.error(e);
         alert('Host start failed. See console.');
@@ -2137,31 +2153,47 @@ window.leaveWebRTC = async function leaveWebRTC() {
       return;
     }
 
-    // JOINER PATH: just ask for session id and join
-    if (netplayMode === 'joining' || netplayMode === 'joiner') {
-      let sid = prompt('Enter session ID to join:', '');
-      if (sid === null) { // cancelled
-        sharedConsoleEnabled = false;
-        updateNetplayVisuals();
-        return;
-      }
-      if (!sid) {
-        alert('No session ID provided. Aborting join.');
-        sharedConsoleEnabled = false;
-        updateNetplayVisuals();
-        return;
-      }
+// JOINER PATH: just ask for session id and join
+if (netplayMode === 'joining' || netplayMode === 'joiner') {
+  let sid = prompt('Enter session ID to join:', '');
+  if (sid === null) { // cancelled
+    sharedConsoleEnabled = false;
+    updateNetplayVisuals();
+    return;
+  }
+  if (!sid) {
+    alert('No session ID provided. Aborting join.');
+    sharedConsoleEnabled = false;
+    updateNetplayVisuals();
+    return;
+  }
 
+  try {
+    await window.joinWebRTC(sid);
+    ejsNotify(`Joining session "${sid}".`);
+
+    // ---- PAUSE local emulator on joiner device ----
+    if (window.EJS_emulator && typeof window.EJS_emulator.pause === 'function') {
       try {
-        await window.joinWebRTC(sid);
-        alert(`Joining session "${sid}".`);
-      } catch (e) {
-        console.error(e);
-        alert('Join failed. See console.');
-        sharedConsoleEnabled = false;
-        updateNetplayVisuals();
+        // true -> don't trigger UI/remote updates (matches other netplay uses)
+        window.EJS_emulator.pause(true);
+
+        if (typeof window.EJS_emulator.displayMessage === 'function') {
+          window.EJS_emulator.displayMessage('Paused (joiner mode) — using host stream');
+        } else {
+          ejsNotify('Local emulator paused (joiner mode).');
+        }
+      } catch (pauseErr) {
+        console.warn('Failed to pause local emulator on join:', pauseErr);
       }
     }
+  } catch (e) {
+    console.error(e);
+    alert('Join failed. See console.');
+    sharedConsoleEnabled = false;
+    updateNetplayVisuals();
+  }
+}
   };
 })();
 
