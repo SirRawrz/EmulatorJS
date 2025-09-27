@@ -5490,6 +5490,153 @@ window.EJS_handleRemoteInputs = window.EJS_handleRemoteInputs || function(payloa
       }
 
       // Prefer numeric button events (most reliable). Joiner may include buttonIndex.
+      // --- INSERTED: handle ev.axis floats/pre-scaled ints for remote analog ---
+      if (ev && ev.axis && typeof ev.value === 'number') {
+        try {
+          const axisMap = {
+            'LEFT_STICK_X': [16, 17],
+            'LEFT_STICK_Y': [18, 19],
+            'RIGHT_STICK_X': [20, 21],
+            'RIGHT_STICK_Y': [22, 23]
+          };
+          const pair = axisMap[ev.axis];
+          if (pair) {
+            // ev.value may be normalized (-1..1) or already scaled (-32767..32767)
+            let v = ev.value;
+            if (Math.abs(v) <= 1.0) {
+              v = Math.round(0x7fff * v); // scale normalized float to emulator range
+            } else {
+              v = Math.round(v); // assume it's pre-scaled
+            }
+
+            // Prefer the public wrapper if present (queues if necessary)
+            if (typeof window.EJS_simulateInput === 'function') {
+              if (v > 0) {
+                window.EJS_simulateInput(player, pair[0], v);
+                window.EJS_simulateInput(player, pair[1], 0);
+              } else {
+                window.EJS_simulateInput(player, pair[1], -v);
+                window.EJS_simulateInput(player, pair[0], 0);
+              }
+              continue;
+            }
+
+            // Fallback directly into emulator if wrapper isn't present
+            if (window.EJS_emulator && window.EJS_emulator.gameManager && typeof window.EJS_emulator.gameManager.simulateInput === 'function') {
+              if (v > 0) {
+                window.EJS_emulator.gameManager.simulateInput(player, pair[0], v);
+                window.EJS_emulator.gameManager.simulateInput(player, pair[1], 0);
+              } else {
+                window.EJS_emulator.gameManager.simulateInput(player, pair[1], -v);
+                window.EJS_emulator.gameManager.simulateInput(player, pair[0], 0);
+              }
+              continue;
+            }
+          }
+        } catch (err) {
+          console.warn('EJS_handleRemoteInputs axis handling failed', err);
+        }
+      }
+
+      // Prefer numeric button events (most reliable). Joiner may include buttonIndex.
+      // --- INSERTED: handle ev.axis floats/pre-scaled ints for remote analog ---
+      if (ev && ev.axis && typeof ev.value === 'number') {
+        try {
+          const axisMap = {
+            'LEFT_STICK_X': [16, 17],
+            'LEFT_STICK_Y': [18, 19],
+            'RIGHT_STICK_X': [20, 21],
+            'RIGHT_STICK_Y': [22, 23]
+          };
+          const pair = axisMap[ev.axis];
+          if (pair) {
+            // ev.value may be normalized (-1..1) or already scaled (-32767..32767)
+            let v = ev.value;
+            if (Math.abs(v) <= 1.0) {
+              v = Math.round(0x7fff * v); // scale normalized float to emulator range
+            } else {
+              v = Math.round(v); // assume it's pre-scaled
+            }
+
+            // Prefer the public wrapper if present (queues if necessary)
+            if (typeof window.EJS_simulateInput === 'function') {
+              if (v > 0) {
+                window.EJS_simulateInput(player, pair[0], v);
+                window.EJS_simulateInput(player, pair[1], 0);
+              } else {
+                window.EJS_simulateInput(player, pair[1], -v);
+                window.EJS_simulateInput(player, pair[0], 0);
+              }
+              continue;
+            }
+
+            // Fallback directly into emulator if wrapper isn't present
+            if (window.EJS_emulator && window.EJS_emulator.gameManager && typeof window.EJS_emulator.gameManager.simulateInput === 'function') {
+              if (v > 0) {
+                window.EJS_emulator.gameManager.simulateInput(player, pair[0], v);
+                window.EJS_emulator.gameManager.simulateInput(player, pair[1], 0);
+              } else {
+                window.EJS_emulator.gameManager.simulateInput(player, pair[1], -v);
+                window.EJS_emulator.gameManager.simulateInput(player, pair[0], 0);
+              }
+              continue;
+            }
+          }
+        } catch (err) {
+          console.warn('EJS_handleRemoteInputs axis handling failed', err);
+        }
+      }
+
+      // Prefer numeric button events (most reliable). Joiner may include buttonIndex.
+      // --- INSERTED: handle ev.axis floats/pre-scaled ints for remote analog ---
+      if (ev && ev.axis && typeof ev.value === 'number') {
+        try {
+          const axisMap = {
+            'LEFT_STICK_X': [16, 17],
+            'LEFT_STICK_Y': [18, 19],
+            'RIGHT_STICK_X': [20, 21],
+            'RIGHT_STICK_Y': [22, 23]
+          };
+          const pair = axisMap[ev.axis];
+          if (pair) {
+            // ev.value may be normalized (-1..1) or already scaled (-32767..32767)
+            let v = ev.value;
+            if (Math.abs(v) <= 1.0) {
+              v = Math.round(0x7fff * v); // scale normalized float to emulator range
+            } else {
+              v = Math.round(v); // assume it's pre-scaled
+            }
+
+            // Prefer the public wrapper if present (queues if necessary)
+            if (typeof window.EJS_simulateInput === 'function') {
+              if (v > 0) {
+                window.EJS_simulateInput(player, pair[0], v);
+                window.EJS_simulateInput(player, pair[1], 0);
+              } else {
+                window.EJS_simulateInput(player, pair[1], -v);
+                window.EJS_simulateInput(player, pair[0], 0);
+              }
+              continue;
+            }
+
+            // Fallback directly into emulator if wrapper isn't present
+            if (window.EJS_emulator && window.EJS_emulator.gameManager && typeof window.EJS_emulator.gameManager.simulateInput === 'function') {
+              if (v > 0) {
+                window.EJS_emulator.gameManager.simulateInput(player, pair[0], v);
+                window.EJS_emulator.gameManager.simulateInput(player, pair[1], 0);
+              } else {
+                window.EJS_emulator.gameManager.simulateInput(player, pair[1], -v);
+                window.EJS_emulator.gameManager.simulateInput(player, pair[0], 0);
+              }
+              continue;
+            }
+          }
+        } catch (err) {
+          console.warn('EJS_handleRemoteInputs axis handling failed', err);
+        }
+      }
+
+      // Numeric button/axis-index path (existing behavior)
       if (typeof ev.buttonIndex === 'number' && isFinite(ev.buttonIndex)) {
         // Determine an appropriate value: for keydown -> 1, keyup -> 0.
         // Some axes/specials may include 'value' already.
@@ -5512,6 +5659,7 @@ window.EJS_handleRemoteInputs = window.EJS_handleRemoteInputs || function(payloa
           }
         } catch (e) {}
       }
+
 
       // Fallback: if we have a key string, try the shim simulate_input (synth keyboard or internal)
       if (ev.key) {
