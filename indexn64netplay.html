@@ -1800,15 +1800,231 @@ try {
           npw.dc.send(JSON.stringify(payload));
         }
       } catch (e) { /* ignore send errors */ }
-    };
+};
 
     window.addEventListener('keydown', sendEvent, { capture: false });
     window.addEventListener('keyup', sendEvent, { capture: false });
     npw._joinHandlers = sendEvent;
+
+    // Make chosenSlot visible on npw in case optimizedPoll runs where chosenSlot isn't lexically visible
+    try { if (typeof chosenSlot !== 'undefined') npw._chosenSlot = chosenSlot; } catch (e) {}
+
+    // --- optimized gamepad polling (low-cost) ---
+    function getCtrlIndexForSemantic(slot, semantic) {
+      try {
+        if (!window.EJS_defaultControls) return undefined;
+        const map = window.EJS_defaultControls[slot] || {};
+        for (const k of Object.keys(map)) {
+          const entry = map[k] || {};
+          const v1 = (entry.value) ? String(entry.value) : '';
+          const v2 = (entry.value2) ? String(entry.value2) : '';
+          if (!v1 && !v2) continue;
+          if (v1 && v1.indexOf(semantic) === 0) return Number(k);
+          if (v2 && v2.indexOf(semantic) === 0) return Number(k);
+        }
+        return undefined;
+      } catch (e) { return undefined; }
+    }
+
+    const lastTimestamps = [];
+    const lastButtonState = {};
+    const lastAxisDir = {};
+    const AXIS_THRESHOLD = 0.5;
+
+    if (typeof npw._sendSeq === 'undefined') npw._sendSeq = 1;
+    npw._gamepadPollActive = true;
+
+    function sendGamepadEvent(slot, buttonIndex, value) {
+      try {
+        if (typeof buttonIndex !== 'number' || !isFinite(buttonIndex)) return;
+        const payload = {
+          seq: ++npw._sendSeq,
+          events: [{
+            type: 'gamepad',
+            player: slot,
+            buttonIndex: Number(buttonIndex),
+            value: Number(value),
+            timestamp: Date.now()
+          }]
+        };
+        // debug: show mapping in console so we can see which slot each gamepad event goes to
+        console.log('[joiner] sendGamepadEvent ->', { slot, buttonIndex, value });
+        if (npw.dc && npw.dc.readyState === 'open') {
+          npw.dc.send(JSON.stringify(payload));
+        }
+      } catch (e) { /* ignore send errors */ }
+    }
+
+    function optimizedPoll() {
+      if (!npw._gamepadPollActive) return;
+
+      if (document.hidden) {
+        npw._gamepadRafId = window.requestAnimationFrame(optimizedPoll);
+        return;
+      }
+
+      try {
+        const gps = (navigator.getGamepads) ? navigator.getGamepads() : [];
+        for (let g = 0; g < (gps ? gps.length : 0); g++) {
+          const gp = gps[g];
+          if (!gp) continue;
+
+          if (typeof gp.timestamp === 'number') {
+            if (lastTimestamps[g] === gp.timestamp) continue;
+            lastTimestamps[g] = gp.timestamp;
+          }
+
+          // prefer assignedSlot, then lexical chosenSlot (visible here), then npw._chosenSlot, then fallback 1
+          const slot = (typeof npw._assignedSlot === 'number')
+            ? npw._assignedSlot
+            : (typeof chosenSlot === 'number'
+                ? chosenSlot
+                : (typeof npw._chosenSlot === 'number' ? npw._chosenSlot : 1));
+
+          // Buttons
+// map browser gamepad button index -> semantic name (v2 in EJS_defaultControls)
+const GAMEPAD_BUTTON_TO_SEMANTIC = {
+  0: 'BUTTON_1',    // A
+  1: 'BUTTON_2',    // B
+  2: 'BUTTON_3',    // X
+  3: 'BUTTON_4',    // Y
+  4: 'LEFT_TOP_SHOULDER',
+  5: 'RIGHT_TOP_SHOULDER',
+  6: 'LEFT_BOTTOM_SHOULDER',
+  7: 'RIGHT_BOTTOM_SHOULDER',
+  8: 'SELECT',      // Back
+  9: 'START',       // Start
+  10: 'LEFT_STICK',
+  11: 'RIGHT_STICK',
+  12: 'DPAD_UP',
+  13: 'DPAD_DOWN',
+  14: 'DPAD_LEFT',
+  15: 'DPAD_RIGHT'
+};
+
+// Buttons: only act on state change
+const buttons = gp.buttons || [];
+for (let b = 0; b < buttons.length; b++) {
+  const pressed = !!(buttons[b] && (buttons[b].pressed || (typeof buttons[b].value === 'number' && buttons[b].value > 0.5)));
+  const key = `${g}:${b}`;
+  if (lastButtonState[key] !== pressed) {
+    lastButtonState[key] = pressed;
+    try {
+      // Map this specific physical button index -> semantic -> control index
+      const semantic = GAMEPAD_BUTTON_TO_SEMANTIC[b];
+      if (!semantic) {
+        // unknown mapping, fall back to sending raw button index
+        sendGamepadEvent(slot, b, pressed ? 1 : 0);
+        continue;
+      }
+      const ctrlIdx = getCtrlIndexForSemantic(slot, semantic);
+      if (typeof ctrlIdx === 'number') {
+        sendGamepadEvent(slot, ctrlIdx, pressed ? 1 : 0);
+      } else {
+        // If the semantic isn't mapped in EJS_defaultControls, fallback to raw button index
+        sendGamepadEvent(slot, b, pressed ? 1 : 0);
+      }
+    } catch (e) {
+      // On any error, fallback to sending the raw button index so input still works
+      sendGamepadEvent(slot, b, pressed ? 1 : 0);
+    }
   }
+}
+
+          // Axes -> directional states
+          const axes = gp.axes || [];
+         for (let a = 0; a < axes.length; a++) {
+  const raw = typeof axes[a] === 'number' ? axes[a] : 0;
+  // scale to emulator resolution (-32767..32767)
+  const scaled = Math.round(Math.max(-1, Math.min(1, raw)) * 0x7fff);
+  const key = `${g}:axis:${a}`;
+  const prev = (typeof lastAxisDir[key] === 'number') ? lastAxisDir[key] : 0;
+
+  // Only send if value changed (avoid spamming identical values)
+  if (scaled !== prev) {
+    lastAxisDir[key] = scaled;
+    try {
+      // map axis index -> semantic pairs
+      let plusSem = null, minusSem = null;
+      if (a === 0) { plusSem = 'LEFT_STICK_X:+1'; minusSem = 'LEFT_STICK_X:-1'; }
+      else if (a === 1) { plusSem = 'LEFT_STICK_Y:+1'; minusSem = 'LEFT_STICK_Y:-1'; }
+      else if (a === 2) { plusSem = 'RIGHT_STICK_X:+1'; minusSem = 'RIGHT_STICK_X:-1'; }
+      else if (a === 3) { plusSem = 'RIGHT_STICK_Y:+1'; minusSem = 'RIGHT_STICK_Y:-1'; }
+
+      // Resolve mapped indices once and reuse
+      const idxPlus = plusSem ? getCtrlIndexForSemantic(slot, plusSem) : null;
+      const idxMinus = minusSem ? getCtrlIndexForSemantic(slot, minusSem) : null;
+      const hasMapping = (typeof idxPlus === 'number' || typeof idxMinus === 'number');
+
+      if (hasMapping) {
+        if (scaled > 0) {
+          if (typeof idxPlus === 'number') sendGamepadEvent(slot, idxPlus, scaled);
+          if (typeof idxMinus === 'number') sendGamepadEvent(slot, idxMinus, 0);
+        } else if (scaled < 0) {
+          if (typeof idxMinus === 'number') sendGamepadEvent(slot, idxMinus, -scaled);
+          if (typeof idxPlus === 'number') sendGamepadEvent(slot, idxPlus, 0);
+        } else {
+          // neutral
+          if (typeof idxPlus === 'number') sendGamepadEvent(slot, idxPlus, 0);
+          if (typeof idxMinus === 'number') sendGamepadEvent(slot, idxMinus, 0);
+        }
+      } else {
+        // fallback compatibility for unmapped axes (preserve original base ids)
+        const base = 1000 + (a * 2);
+        if (scaled > 0) { sendGamepadEvent(slot, base, scaled); sendGamepadEvent(slot, base + 1, 0); }
+        else if (scaled < 0) { sendGamepadEvent(slot, base, 0); sendGamepadEvent(slot, base + 1, -scaled); }
+        else { sendGamepadEvent(slot, base, 0); sendGamepadEvent(slot, base + 1, 0); }
+      }
+    } catch (e) {}
+  }
+}
+        }
+      } catch (e) {
+        // ignore polling errors
+      }
+
+      try {
+        npw._gamepadRafId = window.requestAnimationFrame(optimizedPoll);
+      } catch (e) {
+        setTimeout(optimizedPoll, 1000 / 30);
+      }
+    }
+
+    try {
+      if (!npw._gamepadRafId) npw._gamepadRafId = window.requestAnimationFrame(optimizedPoll);
+    } catch (e) {
+      setTimeout(optimizedPoll, 1000 / 30);
+    }
+
+    function onGpConnect() {
+      if (!npw._gamepadPollActive) {
+        npw._gamepadPollActive = true;
+        if (!npw._gamepadRafId) npw._gamepadRafId = window.requestAnimationFrame(optimizedPoll);
+      }
+    }
+    function onGpDisconnect() {
+      // no-op
+    }
+    window.addEventListener('gamepadconnected', onGpConnect);
+    window.addEventListener('gamepaddisconnected', onGpDisconnect);
+
+    npw._stopGamepadPolling = function() {
+      try {
+        npw._gamepadPollActive = false;
+        if (npw._gamepadRafId) {
+          window.cancelAnimationFrame(npw._gamepadRafId);
+          npw._gamepadRafId = null;
+        }
+        window.removeEventListener('gamepadconnected', onGpConnect);
+        window.removeEventListener('gamepaddisconnected', onGpDisconnect);
+      } catch (e) {}
+    };
+  }
+
 
   return pc;
 }; // end joinWebRTC
+
 
 // Expose leaveWebRTC globally
 window.leaveWebRTC = async function leaveWebRTC() {
