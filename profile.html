@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Choose Profile</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      flex-direction: column;
+      font-family: Arial, sans-serif;
+      background-color: #212222;
+      color: white;
+    }
+    header {
+      position: relative;
+      display: flex;
+      align-items: center;
+      height: 48px;
+      background: rgba(0,0,0,0.2);
+      flex-shrink: 0;
+    }
+    .left-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: 12px;
+    }
+    .left-group button {
+      background: rgba(128,128,128,0.7);
+      border: none;
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      color: white;
+    }
+    .left-group .profile-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.7);
+      object-fit: cover;
+      cursor: pointer;
+    }
+    .title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1rem;
+      font-weight: bold;
+    }
+    .profiles-container {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+      align-content: flex-start;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .profile-card {
+      text-align: center;
+      cursor: pointer;
+      padding: 10px;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      transition: border-color 0.2s ease;
+      width: 120px;
+    }
+    .profile-card.active { border-color: gold; }
+    .profile-card img {
+      width: 100px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 10px;
+      display: block;
+      margin: 0 auto 8px auto;
+    }
+    .profile-card p { margin: 0; font-weight: bold; word-break: break-word; }
+    .nav-buttons {
+      flex-shrink: 0;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      padding: 12px;
+      background: rgba(0,0,0,0.2);
+    }
+    .nav-buttons button {
+      background-color: rgba(128,128,128,0.7);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      width: 100%;
+      text-align: center;
+      transition: background-color 0.2s ease;
+    }
+    .nav-buttons button:hover { background-color: rgba(160,160,160,0.7); }
+    /* small helper for no-image */
+    .placeholder {
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.6);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="left-group">
+      <button onclick="location.href='./index.html'">Home</button>
+      <img id="topProfileIcon"
+           class="profile-icon"
+           src=""
+           alt="Active Profile"
+           onclick="location.href='./profile.html'"/>
+    </div>
+    <div class="title" id="siteTitle">Choose Your Profile</div>
+  </header>
+
+  <div class="profiles-container" id="profilesContainer"></div>
+
+  <div class="nav-buttons">
+    <button onclick="location.href='./tvd.html'">TV</button>
+    <button onclick="location.href='./radio.html'">Radio</button>
+    <button onclick="location.href='./Books.html'">Books</button>
+    <button onclick="location.href='./Music.html'">Music</button>
+    <button onclick="location.href='./Manga.html'">Manga</button>
+    <button onclick="window.location = document.referrer || './profile.html'">Back</button>
+  </div>
+
+  <!-- load the profiles list (this file can be swapped/edited per-setup) -->
+  <script src="./profiles.js"></script>
+
+  <script>
+    // Robust parser: accept either array-of-strings or array-of-{name,image}
+    // If profiles.js sets window.profiles before this file, profiles.js will pick it up.
+    // profiles variable should exist (profiles.js defines it). We'll fallback to window.profiles
+    const RAW_PROFILES = (typeof profiles !== 'undefined') ? profiles : (window.profiles || []);
+    // normalize to array of { name, image }
+    const normalizedProfiles = RAW_PROFILES.map(item => {
+      if (!item) return null;
+      if (typeof item === 'string') return { name: item, image: `./Profiles/${item}.jpg` };
+      // if object:
+      const name = item.name || item.id || item.label || "Guest";
+      const image = item.image || `./Profiles/${name}.jpg`;
+      return { name, image };
+    }).filter(Boolean);
+
+    // Default active profile: localStorage, else first profile name, else "Guest"
+    let active = localStorage.getItem("activeProfile");
+    if (!active) {
+      active = (normalizedProfiles.length && normalizedProfiles[0].name) ? normalizedProfiles[0].name : "Guest";
+      localStorage.setItem("activeProfile", active);
+    }
+
+    const container = document.getElementById("profilesContainer");
+    const topIcon = document.getElementById("topProfileIcon");
+
+    // fallback image if profile image fails to load
+    const FALLBACK_IMAGE = "./Profiles/Guest.jpg"; // change if you want a different fallback
+
+    function getProfileByName(name) {
+      return normalizedProfiles.find(p => p.name === name);
+    }
+
+    function resolveImageFor(name) {
+      const p = getProfileByName(name);
+      if (p && p.image) return p.image;
+      return `./Profiles/${name}.jpg`;
+    }
+
+    function renderTopIcon() {
+      const imgSrc = resolveImageFor(active) || FALLBACK_IMAGE;
+      topIcon.src = imgSrc;
+      topIcon.alt = active || "Active";
+      // if the image 404s, show fallback
+      topIcon.onerror = () => {
+        if (topIcon.src !== FALLBACK_IMAGE) topIcon.src = FALLBACK_IMAGE;
+      };
+    }
+
+    function renderProfiles() {
+      container.innerHTML = "";
+      normalizedProfiles.forEach(profile => {
+        const card = document.createElement("div");
+        card.className = "profile-card" + (profile.name === active ? " active" : "");
+        // create image element with graceful fallback
+        const img = document.createElement("img");
+        img.src = profile.image || `./Profiles/${profile.name}.jpg`;
+        img.alt = profile.name;
+        img.onerror = () => {
+          // replace broken image with a placeholder element
+          const placeholder = document.createElement("div");
+          placeholder.className = "placeholder";
+          placeholder.style.width = "100px";
+          placeholder.style.height = "100px";
+          placeholder.style.borderRadius = "10px";
+          placeholder.textContent = profile.name[0] || "?";
+          if (img.parentNode) img.parentNode.replaceChild(placeholder, img);
+        };
+
+        const p = document.createElement("p");
+        p.textContent = profile.name;
+
+        card.appendChild(img);
+        card.appendChild(p);
+
+        card.onclick = () => {
+          active = profile.name;
+          localStorage.setItem("activeProfile", active);
+          renderProfiles();
+          renderTopIcon();
+        };
+
+        container.appendChild(card);
+      });
+
+      // if no profiles are defined, show a helpful message
+      if (normalizedProfiles.length === 0) {
+        const msg = document.createElement("div");
+        msg.style.color = "rgba(255,255,255,0.7)";
+        msg.style.padding = "20px";
+        msg.textContent = "No profiles found — edit profiles.js or set window.profiles before loading it.";
+        container.appendChild(msg);
+      }
+    }
+
+    // initial render
+    renderTopIcon();
+    renderProfiles();
+  </script>
+</body>
+</html>
