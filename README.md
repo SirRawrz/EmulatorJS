@@ -7,7 +7,6 @@ If you're using the **SirRawrz** fork of EmulatorJS, follow these steps to get a
 1. **Download the fork**
    Clone or download the repo at:
    `https://github.com/SirRawrz/EmulatorJS`
-   *(Note: I haven't synced the core files with the main project recently — I may touch them tonight. N64 and PSX HTMLs are updated with working netplay. Right now I changed `index.html` for certain consoles to use a specific file per console; I'll eventually switch this to a URL modifier.)*
 
 2. **Install Simple Web Server (Windows)**
    Download and install Simple Web Server:
