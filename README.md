@@ -1,7 +1,96 @@
-This is a Fork of EmulatorJS. Only the index.html has changed (and also now the emulator.js to assist with netplay inputs.) For each of the different emulators I have seperate index.htmls. indexgba.html for example. This fork when self hosted with https://simplewebserver.org/ on windows or https://play.google.com/store/apps/details?id=com.phlox.simpleserver.plus&hl=en_US for android (Change Platform to "android" instead of "windows" in platform.txt if using the android setup. It is set to windows by default.) For PSP to work you will need to setup custom headers (I'll come back with these) and to generate a certificate for your https server, as shared array buffer requires https, and https requires this a cert.  
+<br>
 
-Set your serverip.txt to the ip you're selfhosting. "192.168.0.205:8080" for example. (This method is intended for local only. If you want to use it away from home, look into something like Tailscale.)
-(WARNING: Still under construction until this is removed!)
+### Quick start — SirRawrz fork
+
+If you're using the **SirRawrz** fork of EmulatorJS, follow these steps to get a local server running with playable single- and shared-console netplay.
+
+1. **Download the fork**
+   Clone or download the repo at:
+   `https://github.com/SirRawrz/EmulatorJS`
+   *(Note: I haven't synced the core files with the main project recently — I may touch them tonight. N64 and PSX HTMLs are updated with working netplay. Right now I changed `index.html` for certain consoles to use a specific file per console; I'll eventually switch this to a URL modifier.)*
+
+2. **Install Simple Web Server (Windows)**
+   Download and install Simple Web Server:
+   `https://simplewebserver.org/download.html`
+   In the Basic options choose **Allow local area network access**.
+   In Advanced options enable **Allow file uploads** and **Allow replacing files**.
+   Point the web server's document root to the folder that contains the fork files (where `indexpsx.html`, `indexn64.html`, `roms/`, `profiles/`, etc. live).
+
+3. **Install Tailscale**
+   Install Tailscale on the same computer and log in to an account you can share with family members who will join. This provides an easy way for remote players to reach your server without messing with router configuration.
+
+4. **Configure IP files**
+   Edit `serverip.txt` and `tailscaleserverip.txt` with the appropriate IP and port.
+
+   * `serverip.txt` — put your local LAN IP (e.g. `192.168.0.205:8080`). This is **not** the internet-facing IP.
+   * `tailscaleserverip.txt` — put your Tailscale IP (e.g. `100.1.121.115:8080`).
+
+5. **Customize profiles**
+   Edit `profile.js` to include your profile names. Place avatar/icon images named exactly as the profile keys inside `/profiles`.
+
+6. **Add ROMs**
+   Save your ROMs / images / CHD files inside the `roms` folder.
+
+7. **Launch a game**
+   Open the game URL from a browser (example using local LAN IP):
+
+   ```
+   http://192.168.0.205:8080/indexpsx.html?rom=DigimonWorld3.chd
+   ```
+
+   Or, if using Tailscale (remote player), use the tailscale address you put in `tailscaleserverip.txt`, e.g.:
+
+   ```
+   http://100.1.121.115:8080/indexpsx.html?rom=DigimonWorld3.chd
+   ```
+
+> [!TIP]
+> Use the same port for local and Tailscale access (e.g. `:8080`) to keep configuration simple.
+
+<br>
+
+### Netplay (Shared Console) — Host & Join flow
+
+* On the **host** machine (ideally the machine physically on the LAN to reduce latency):
+
+  * Open the game page.
+  * Go to **Netplay → Host → Shared Console**.
+  * Choose the number of players (2–4).
+  * Pick a room number (e.g. `1`).
+
+* On the **joiner** device:
+
+  * They must have Tailscale installed if they are remote. Local LAN joiners do **not** need Tailscale.
+  * Open the same game URL (use the Tailscale IP for remote players, or the LAN IP for local players).
+  * Go to **Netplay → Join → Shared Console** and enter the room number (e.g. `1`).
+
+At this point the server should be playable for single player (server-side save states/loads) and set up for multiplayer. For the joining player to join they need to have Tailscale installed on the device they are playing on and have the Tailscale IP address (100.x.x.x). That IP should be placed in `tailscaleserverip.txt`. Their join URL will look like:
+
+```
+http://100.1.121.115:8080/indexpsx.html?rom=DigimonWorld3.chd
+```
+
+(if your Tailscale IP is `100.1.121.115` and you use port `8080`).
+
+Player 1 should hit **Netplay → Host → Shared Console**, choose the number of players (2 is common, up to 4), then choose a room number (e.g. `1`). After that Player 2 (the joiner) should hit **Netplay → Join → Shared Console** and enter the same room number (`1`).
+
+Neither player has to be the Windows program-hosting machine — either can host or join — but ideally the host is physically on the local network to avoid extra latency. Local players on the same LAN do **not** need Tailscale installed to play.
+
+<br>
+
+### Useful links
+
+* Fork: `https://github.com/SirRawrz/EmulatorJS`
+* Simple Web Server (download): `https://simplewebserver.org/download.html`
+* Tailscale: `https://tailscale.com/`
+
+<br>
+
+> **At this point the server should be playable for single player** (server-side save/load) and **set up for multiplayer**. If you run into problems, consider opening an ***[Issue]*** with logs and details.
+
+<br>
+
+(WARNING: Still testing things until this is removed!)
 <div align = center>
 
 <img width = 300 src = docs/Logo-light.png#gh-dark-mode-only>
