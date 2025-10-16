@@ -234,8 +234,9 @@
   window.EJS_gameName    = romParam;
 window.EJS_biosUrl = `http://${serverIP}/emulator/SCPH1001.BIN`;
   window.EJS_gameUrl     = `http://${serverIP}/emulator/roms/${romParam}?t=${Date.now()}`;
- window.EJS_core        = "snes";
+ window.EJS_core        = "psp";
   window.EJS_pathtodata  = "data/";
+  		window.EJS_threads = true;
   window.EJS_startOnLoaded = true;
 EJS_defaultControls = {
   0: { // player 0 (unique single chars)
