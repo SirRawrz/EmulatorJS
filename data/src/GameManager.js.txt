@@ -35,19 +35,7 @@ class EJS_GameManager {
         
         this.writeFile("/home/web_user/retroarch/userdata/retroarch.cfg", this.getRetroArchCfg());
         
-        
-
-  writeConfigFile() {
-           this.EJS.defaultCoreOpts.settings = {
-            ...this.EJS.defaultCoreOpts.settings,
-            'pcsx_rearmed_psxclock': '30',
-            'pcsx_rearmed_cd_readahead': '32'
-        };
-
-        let output = "";
-        for (const k in this.EJS.defaultCoreOpts.settings) {
-            output += k + ' = "' + this.EJS.defaultCoreOpts.settings[k] +'"\n';
-        }
+        this.writeConfigFile();
         this.initShaders();
 
         this.EJS.on("exit", () => {
@@ -76,16 +64,13 @@ class EJS_GameManager {
         });
     }
     writeConfigFile() {
-     this.EJS.defaultCoreOpts.settings = {
-        ...this.EJS.defaultCoreOpts.settings, // Preserve existing settings
-        'pcsx_rearmed_psxclock': '30',        // Force PSX clock to 30
-        'pcsx_rearmed_cd_readahead': '32'       // Force CD readahead to 32
-    };
-
-    let output = "";
-    for (const k in this.EJS.defaultCoreOpts.settings) {
-        output += k + ' = "' + this.EJS.defaultCoreOpts.settings[k] + '"\n';
-    }}
+        if (!this.EJS.defaultCoreOpts.file || !this.EJS.defaultCoreOpts.settings) {
+            return;
+        }
+        let output = "";
+        for (const k in this.EJS.defaultCoreOpts.settings) {
+            output += k + ' = "' + this.EJS.defaultCoreOpts.settings[k] +'"\n';
+        }
 
         this.writeFile("/home/web_user/retroarch/userdata/config/" + this.EJS.defaultCoreOpts.file, output);
     }

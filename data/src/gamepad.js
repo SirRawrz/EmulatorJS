@@ -1,13 +1,10 @@
 class GamepadHandler {
-    gamepads;
-    timeout;
-    listeners;
     constructor() {
         this.buttonLabels = {
-            0: 'BUTTON_1',
-            1: 'BUTTON_2',
-            2: 'BUTTON_3',
-            3: 'BUTTON_4',
+            0: 'BUTTON_2',
+            1: 'BUTTON_1',
+            2: 'BUTTON_4',
+            3: 'BUTTON_3',
             4: 'LEFT_TOP_SHOULDER',
             5: 'RIGHT_TOP_SHOULDER',
             6: 'LEFT_BOTTOM_SHOULDER',
@@ -37,16 +34,7 @@ class GamepadHandler {
         this.timeout = setTimeout(this.loop.bind(this), 10);
     }
     updateGamepadState() {
-        let gamepads = Array.from(this.getGamepads());
-        if (!gamepads) return;
-        if (!Array.isArray(gamepads) && gamepads.length) {
-            let gp = [];
-            for (let i=0; i<gamepads.length; i++) {
-                gp.push(gamepads[i]);
-            }
-            gamepads = gp;
-        } else if (!Array.isArray(gamepads)) return;
-
+        const gamepads = Array.from(this.getGamepads());
         gamepads.forEach((gamepad, index) => {
             if (!gamepad) return;
             let hasGamepad = false;
@@ -59,15 +47,13 @@ class GamepadHandler {
                     id: oldGamepad.id
                 }
                 hasGamepad = true;
-
+                
                 oldGamepad.axes.forEach((axis, axisIndex) => {
                     const val = (axis < 0.01 && axis > -0.01) ? 0 : axis;
                     const newVal = (gamepad.axes[axisIndex] < 0.01 && gamepad.axes[axisIndex] > -0.01) ? 0 : gamepad.axes[axisIndex];
                     if (newVal !== val) {
-                        let axis = ['LEFT_STICK_X', 'LEFT_STICK_Y', 'RIGHT_STICK_X', 'RIGHT_STICK_Y'][axisIndex];
-                        if (!axis) {
-                            axis = "EXTRA_STICK_" + axisIndex;
-                        }
+                        const axis = ['LEFT_STICK_X', 'LEFT_STICK_Y', 'RIGHT_STICK_X', 'RIGHT_STICK_Y'][axisIndex];
+                        if (!axis) return;
                         this.dispatchEvent('axischanged', {
                             axis: axis,
                             value: newVal,
@@ -78,7 +64,7 @@ class GamepadHandler {
                     }
                     gamepadToSave.axes[axisIndex] = newVal;
                 })
-
+                
                 gamepad.buttons.forEach((button, buttonIndex) => {
                     let pressed = oldGamepad.buttons[buttonIndex] === 1.0;
                     if (typeof oldGamepad.buttons[buttonIndex] === "object") {
@@ -96,22 +82,16 @@ class GamepadHandler {
                             this.dispatchEvent('buttonup', {index: buttonIndex, label:this.getButtonLabel(buttonIndex), gamepadIndex: gamepad.index});
                         }
                     }
-
+                    
                 })
                 this.gamepads[oldIndex] = gamepadToSave;
             })
             if (!hasGamepad) {
                 this.gamepads.push(gamepads[index]);
-                this.gamepads.sort((a, b) => {
-                    if (a == null && b == null) return 0;
-                    if (a == null) return 1;
-                    if (b == null) return -1;
-                    return a.index - b.index;
-                });
                 this.dispatchEvent('connected', {gamepadIndex: gamepad.index});
             }
         });
-
+        
         for (let j=0; j<this.gamepads.length; j++) {
             if (!this.gamepads[j]) continue;
             let has = false;
