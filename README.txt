@@ -3,7 +3,7 @@ This is a very rough and limited copy of a "fork" of ethanthesleepyone's and all
 -------------------------------------------------------------------
 SERVER SETUP
 -------------------------------------------------------------------
-Install Simple Web Server (Windows) Download and install Simple Web Server: https://simplewebserver.org/download.html In the Basic options choose Allow local area network access. In Advanced options enable Allow file uploads and Allow replacing files. Point the web server's document root to the folder that contains the fork files (where indexpsx.html, indexn64.html, roms/, profiles/, etc. live).
+Install Simple Web Server (Windows) Download and install Simple Web Server: https://simplewebserver.org/download.html In the Basic options choose Allow local area network access. In Advanced options enable Allow file uploads and Allow replacing files. 
 
 
 New Server -> 
